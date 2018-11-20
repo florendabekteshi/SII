@@ -1,0 +1,76 @@
+<?php
+Class Aes
+{
+    public static function cipher($input, $w)
+    {
+        $Nb = 4; // block size (in words): no of columns in state (fixed at 4 for AES)
+
+        $Nr = count($w) / $Nb - 1; // no of rounds: 10/12/14 for 128/192/256-bit keys
+
+        $state = array(); // initialise 4xNb byte-array 'state' with input 
+
+        for ($i = 0; $i < 4 * $Nb; $i++) 
+
+            //Saves the input as a matrix 4 x 4 ---- floor function rounds a number down to nearest inetrger
+            $state[$i % 4][floor($i / 4)] = $input[$i];
+
+        //Add round key in first phase before starting rounds
+         $state = self::addRoundKey($state, $w, 0, $Nb);
+
+        // apply Nr rounds
+        for ($round = 1; $round < $Nr; $round++)
+         { 
+            $state = self::subBytes($state, $Nb);
+            $state = self::shiftRows($state, $Nb);
+            $state = self::mixColumns($state, $Nb);
+            $state = self::addRoundKey($state, $w, $round, $Nb);
+        }
+        $state = self::subBytes($state, $Nb);
+        $state = self::shiftRows($state, $Nb);
+        $state = self::addRoundKey($state, $w, $Nr, $Nb);
+
+        $output = array(4 * $Nb); // convert state to 1-d array before returning to matrix 4 x 4
+        for ($i = 0; $i < 4 * $Nb; $i++) 
+            $output[$i] = $state[$i % 4][floor($i / 4)];
+        return $output;
+    }
+    /**
+     * Xor Round Key into state S 
+     */
+    private static function addRoundKey($state, $w, $rnd, $Nb)
+    {
+        for ($r = 0; $r < 4; $r++) {
+            for ($c = 0; $c < $Nb; $c++) 
+                $state[$r][$c] ^= $w[$rnd * 4 + $c][$r];//w0-w3 round0 ; w4-w7 round1; w8-w12 round2.....
+        }
+        return $state;
+    }
+    /**
+     * Apply SBox to state S
+     */
+    private static function subBytes($s, $Nb)
+    {
+        for ($r = 0; $r < 4; $r++) {
+            for ($c = 0; $c < $Nb; $c++) 
+                $s[$r][$c] = self::$sBox[$s[$r][$c]];
+        }
+        return $s;
+    }
+    /**
+     * Shift row r of state S left by r bytes 
+     */
+    private static function shiftRows($s, $Nb)
+    {
+        $t = array(4); // block size = 4
+        //First row doesn't shift 
+        for ($r = 1; $r < 4; $r++) {
+            //Second row shift one byte left, Third row shift two bytes left , Fourth row shift three bytes left
+            for ($c = 0; $c < 4; $c++) 
+            $t[$c] = $s[$r][($c + $r) % $Nb]; // shift into temp copy
+
+            for ($c = 0; $c < 4; $c++)
+             $s[$r][$c] = $t[$c]; // and copy back
+        } 
+        return $s; 
+    }
+    /**
